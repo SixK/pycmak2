@@ -13,11 +13,11 @@ http://www.gson.org/egypt/
 This script has been tested for Morphos Amiga System, but not for Linux or Windows.
 It may work straight without modifications, but some modifications might be necessary.
 
-To manually install, copy cmak2.py /usr/bin/ then copy cmak2.cfg file to /usr/share/cmak/
+To manually install, copy cmak2.py to /usr/bin/ then copy cmak2.cfg file to /usr/share/cmak/  
 
-Typical use (for Morphos):
-cmak2.py src -dl
-cmak2.py src/*.c -dl -e myProg
-cmak2.py test.c -C -noixemul -LD -noixemul
+Typical use (for Morphos):  
+cmak2.py src -dl  
+cmak2.py src/*.c -dl -e myProg  
+cmak2.py test.c -C -noixemul -LD -noixemul  
 
 SixK
