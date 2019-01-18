@@ -8,7 +8,7 @@ import glob
 import datetime
 from argparse import RawTextHelpFormatter
 
-VERSION = '2.6.0 (6/2014)'
+VERSION = '2.7.0 (1/2019)'
 
 
 class HandleFiles(object) :
@@ -24,7 +24,7 @@ class HandleFiles(object) :
 			print ('File "%s" does not exists...\n' % (filename,))
 			sys.exit(1)
    
-		ext = os.path.splitext(filename)[1]
+		ext = os.path.splitext(filename)[-1]
 		invalid_extention = 1
     
 		if ext in self.valid_extention :
@@ -32,10 +32,9 @@ class HandleFiles(object) :
 			self.cpp_source = (0 if (ext == '.c') else 1)
 
 		if invalid_extention == 1 :
-			print 'File %s don\'t have valid c/c++ extension.' % (filename,)
-			# print 'Valid extensions : %s\n' % (', '.join(self.valid_extention))
+			print('File %s don\'t have valid c/c++ extension. --> %s' % (filename,ext))
 		else:
-			print 'Adding file : %s'%(filename)
+			print('Adding file : %s'%(filename))
 			self.cpp_file_list.append(filename)
 
 
@@ -53,18 +52,18 @@ class HandleFiles(object) :
 
 	def find_dir_files(self, dir):
 		''' determine if we have a file, a directory or a pattern and do the appropriate job'''
-		print "Analysing file/dir : %s\n"%(dir)
+		print("Analysing file/dir : %s\n"%(dir))
 
 		# handle single file
 		if os.path.isfile(dir):
 			self.cpp_file(dir)
 			return
-	
+
 		# handle directory
 		if os.path.isdir(dir) :
 			self.include_path_list.append(dir)
 			file_list = os.listdir (dir)
-	
+
 			self.handle_file_list(file_list, dir)
 
 		# handle patterns
@@ -80,26 +79,28 @@ class HandleConfig (object) :
 		self.cmak_header_list=[]
 		self.cmak_ldflags_list=[]
 		self.cmak_cflags_list=[]
-		
+
 		self.loaded = 0
-	
+
 	def checkCfg(self, path) :
 		if self.loaded == 0 :
-			print 'Trying %s'%(path)
-		
+			print('Trying %s'%(path))
+
 		if os.path.exists(path) :
 			self.load_cmak_cfg_ex(path)
 			self.loaded = 1
-	
+			print('Config File Found : %s'%(path))
+
 	def load_cmak_cfg(self):
 		
 		if (self.cmak_cfg != ''):
 			self.checkCfg(self.cmak_cfg)
-						
+
 		self.checkCfg('./cmak2.cfg')
+		self.checkCfg(os.path.dirname(__file__) + '/cmak2.cfg')
 
 		if self.cmak_defined('unix') or self.cmak_defined('morphos'):
-			self.checkCfg('/etc/cmak2.cfg')		
+			self.checkCfg('/etc/cmak2.cfg')
 			self.checkCfg('/usr/share/cmak/cmak2.cfg')
 			self.checkCfg('usr:share/cmak/cmak2.cfg')
 		else:
@@ -107,20 +108,19 @@ class HandleConfig (object) :
 				self.checkCfg('c:\\cmak2.cfg')
 
 		if (self.loaded == 0):
-			print "cmak2.cfg configuration file can't be found ...\n"
+			print("cmak2.cfg configuration file can't be found ...\n")
 			sys.exit(1)
 			
 			
 	def load_cmak_cfg_ex(self, cmak_filename):
 		known_cmds = ['', 'ifdef', 'endif', 'define', 'header', 'cflags_default', 'ldflags_default']
-	
 
 		print ('Reading configuration file %s\n' % (cmak_filename,))
 		line = 0
 		ifdef_list = []
 		ignore_cmd = 0
 		fp = open(cmak_filename, 'r')
-			
+
 		if not fp : 
 			print ("Error when opeing file %s\n" % (cmak_filename,))
 			sys.exit(2)
@@ -133,18 +133,18 @@ class HandleConfig (object) :
 			l = l.strip ()
 			command = l
 			arg = l
-			
+
 			command = re.sub(r'^([^\s]*).*$', r'\1', command)
 			command = command.rstrip()
-			
-			arg = re.sub(r'^[^\s]*', '', arg)	
+
+			arg = re.sub(r'^[^\s]*', '', arg)
 			arg = arg.strip()
 
 			if command not in known_cmds :
 				self.cmak_error(cmak_filename, line, line_str, 'Unknown Command')
 
 			if (command == ''):
-				continue				
+				continue
 				
 			if (command == 'ifdef'):
 				ignore_cmd = (0 if self.cmak_defined(arg) else 1)
@@ -170,7 +170,7 @@ class HandleConfig (object) :
 					if (command == 'define'):
 						self.cmak_define(arg)
 						continue
-					
+
 					if (command == 'header'):
 						table = arg.split(':')
 						if ((len(table) > 3) or (len(table) < 2)):
@@ -180,28 +180,25 @@ class HandleConfig (object) :
 						arg_cflags = ''
 						if len(table) > 2 :
 							arg_cflags = table[2]
-								
-															
+
 						arg_header = arg_header.strip()
 						arg_ldflags = arg_ldflags.strip() 
 						arg_cflags = arg_cflags.strip() 
-							
+
 						self.cmak_header_list.append(arg_header)
 						self.cmak_ldflags_list.append(arg_ldflags)
 						self.cmak_cflags_list.append(arg_cflags)
 						continue		
-					
+
 					if command == 'cflags_default' :
 						table = arg.split(':')
 						self.cflags = self.cflags + table[1]
 						continue
-					
+
 					if command == 'ldflags_default' :
 						table = arg.split(':')
 						self.ldflags = self.ldflags + table[1]
 						continue
-								
-										
 
 	def cmak_error(self, cmak_filename, line, line_str, explication):
 		print ('Error in file %s\n' % (cmak_filename,))
@@ -222,38 +219,36 @@ class HandleConfig (object) :
 		if const in self.define :
 			return 1
 		return 0
-	
 
 class HandleMain(object) :
 	''' Try to find main function and use cpp filename as executable name '''
 	def __init__ (self) :
 		zz=''
-	
+
 	def auto_detect_main(self):
 		if (self.executable != ''):
 			return
-		print 'Search for "main" function...\n'
+		print('Search for "main" function...\n')
 
 		map(self.detect_main, self.cpp_file_list)
-				
+
 	def detect_main(self,filename):
 		print ('Scanning file "%s"...\n' % (filename,))
 		fp = open(filename, 'r')
 		content = fp.read()
 		fp.close()
-	
+
 		if self.test_main(filename, content) == 1:
 			self.executable = os.path.basename(delext(filename))
-			print "Executable : %s"%(self.executable)
+			print("Executable : %s"%(self.executable))
 			return 1
-		return 0	
+		return 0
 
 	def test_main(self, filename, line_str):
 		if re.search('main([ ]*|)\(', line_str):
 			print(('FOUND main in %s' % (filename,)))
 			return 1
 		return 0
-	
 
 
 class HandleLib(object) :
@@ -264,13 +259,12 @@ class HandleLib(object) :
 	def auto_detect_lib(self):
 		''' check all files '''
 		for  value in self.cpp_file_list:
-			print "file: "+value
+			print("file: "+value)
 			self.detect_lib(value, 0, 0)
 	
 	def search_header(self, filename):
 		''' try to find headers '''
 		for value in self.include_path_list:
-			# print 'trying : %s/%s \n'% (value, filename)
 			if os.path.exists(('%s/%s' % (value, filename))):
 				return ('%s/%s' % (value, filename))
 		if os.path.exists(('/usr/include/%s' % (filename,))):
@@ -281,21 +275,19 @@ class HandleLib(object) :
 		if os.path.exists(('/usr/local/include/%s' % (filename,))):
 			return ('/usr/local/include/%s' % (filename,))
 		return filename
-	
+
 	def get_include(self, line_str) :
 		''' find include name in line '''
 		include = line_str.strip()
 		include = re.sub(r'^\s*\#include\s*["<]', '', include)
 		include = re.sub(r'[">].*$', '', include)
-		
+
 		return include
-	
-	
+
 	def find_flags(self, include, filename) :
 		i = 0
 		for value in self.cmak_header_list:
-			# print "value : "+ value
-			if (include == value):
+			if include.startswith(value):
 				if (len(self.cmak_cflags_list)>= i and (self.cmak_cflags_list[i] != '')):
 					self.cflags = self.cflags+ ' %s'%(self.cmak_cflags_list[i],)
 					print ('File %s contains %s so CFLAGS.=%s\n' % (filename, include, self.cmak_cflags_list[i]))
@@ -309,30 +301,30 @@ class HandleLib(object) :
 				break
 
 			i = (i + 1)
-			
+
 		return i
-			
+
 	def already_visited_header(self, filename) :
 		if filename in self.visited_header_list :
 			print ('IGNORE: file %s already scanned\n' % (filename,))
 			return True
-			
-		self.visited_header_list.append(filename)		
+
+		self.visited_header_list.append(filename)
 		return False
-	
+
 	def detect_lib(self, filename, recursive_lvl=0, ignore_error=0):
 		''' auto detect libs and includes to put in flags '''
-		
+
 		if self.verbose:
 				print ('   %s' % (recursive_lvl,))
 				print ('"%s"\n' % (filename,))
-	
+
 		if self.already_visited_header(filename) :
 			return 1
-	
+
 		if (recursive_lvl >= 16):
 			return 0
-			
+
 		filename = self.search_header(filename)
 
 		if os.path.exists(filename) :
@@ -344,24 +336,22 @@ class HandleLib(object) :
 				# sys.exit(1)
 				pass
 			return 1
-	
+
 		for line_str in fp:
-		
 			if line_str.find('#include') != -1:
-	
-				include = self.get_include(line_str) 	
+				include = self.get_include(line_str)
 				i = self.find_flags(include, filename)
-				
+
 				if (i != -1):
 					ignore = 0
 					line_str = re.search(r'\#include.*<.*>' , line_str)
 
 					if line_str != None :
 						ignore = 1
-											
+
 					self.detect_lib(include, (recursive_lvl + 1), ignore)
 			else:
-				if (recursive_lvl == 0):			
+				if (recursive_lvl == 0):
 					if HandleMain().test_main(filename, line_str):
 						executable = os.path.basename(delext(filename))
 
@@ -378,31 +368,30 @@ class HandleInteractive (object) :
 
 	def cmak_prompt(self, question, default):
 		ret = raw_input(question+'\n')
-		print ret
+		print(ret)
 		if ret == '' :
 			ret = default
-	
 		return ret
-	
-	
+
+
 class HandleMakefile(object) :
 	def __init__ (self) :
 		self.cc = 'gcc:g++'
-	
+
 	def getCC(self) :
 		mysplit = self.cc.split(':')
-		
+
 		if self.cpp_source:	ret = mysplit[1]
 		else:	ret = mysplit[0]
-		
+
 		return ret
-	
+
 	def create_makefile(self):
 		global VERSION
  
 		if self.executable == '' :
 			self.executable = 'main'
-	
+
 		self.cc=self.getCC()
 		i = datetime.datetime.now()
 
@@ -413,10 +402,10 @@ class HandleMakefile(object) :
 				debug_string = "objdump --source --line-numbers --demangle --syms --reloc --disassemble-all "
 			else :
 				debug_string = "objdump --syms --reloc --disassemble-all "
-			
+
 		if self.optimize :
 			self.cflags = "-O2 "+self.cflags
-			
+
 		if self.full_optimize :
 			self.cflags = "-O3 "+self.cflags
 			# remove unused functions
@@ -441,7 +430,7 @@ class HandleMakefile(object) :
 			fp.write(('EXE_BASE = %s\n\n' % (exe_base,)))
 		else:
 			fp.write('\n')
-		
+
 		if self.debug :	
 			fp.write('DEBUG = $(EXE).dump\n')
         
@@ -453,9 +442,8 @@ class HandleMakefile(object) :
 			fp.write(' ')
 			if (self.objdir != ''):
 				fp.write('%s/' % (self.objdir,))
-			print "File found : %s"%(value)
-			# value.replace(default_path, '')
-		
+			print("File found : %s"%(value))
+
 			if (value[0:1] == '/'):
 				value = value[1: 1+len(value)]
 			fp.write('%s.o' % (delext(value),))
@@ -494,12 +482,11 @@ class HandleMakefile(object) :
 			fp.write('\n\negypt :\n')
 			fp.write('\tegypt *.expand | dot -Tsvg -o $(EGYPT)')
 
-
 		fp.close()
         
         
 class HandleArgs(object) :
-	def __init__(self) :		
+	def __init__(self) :
 		self.default_path = ''
 		self.makefile = 'Makefile'
 		self.vdetect_lib = 0
@@ -514,12 +501,10 @@ class HandleArgs(object) :
 		self.egypt = False
 		self.file_dir_name = ''
 		self.debug = 0
-	
         
 	def handleMenuArgs(self):
-	
 		global VERSION
-	
+
 		parser = argparse.ArgumentParser(description="cmak version %s, Automatic Makefile Generator\n"
 													"	Author: Achraf cherti <achrafcherti@gmail.com>\n"
 													"	Ported to PHP by SixK (Dirty Port with bugs)\n"
@@ -530,14 +515,14 @@ class HandleArgs(object) :
 																				"based on headers found in source code. \n"
 																				"Edit cmak2.cfg file to \n"
 																				"customise this detection")
-		parser.add_argument("--cfg", help="Select manualy Path for cmak2.cfg")												 
+		parser.add_argument("--cfg", help="Select manualy Path for cmak2.cfg")
 		parser.add_argument("-od", "--obj-dir", help="Directory for .o files")
 		parser.add_argument("-I", "--include-dir", nargs="*", help="Can be defined several times. \n"
 																	"Tell where to find .h files")
 																	
 		parser.add_argument("-L", "--lib-dir", nargs="*", help="Can be defined several times. \n"
 																"Tell where to find .a libraries")
-		parser.add_argument("-LD", "--ldflags", nargs="*", help="Add to LDFLAGS an option (can be defined several times)")												 
+		parser.add_argument("-LD", "--ldflags", nargs="*", help="Add to LDFLAGS an option (can be defined several times)")
 		parser.add_argument("-C", "--cflags", nargs="*", help="Add to CFLAGS an option (can be defined several times)")
 		parser.add_argument("-e", "--executable", help="Executable name after link")
 		parser.add_argument("-m", "--makefile", help="Makefile name (default 'Makefile')")
@@ -548,51 +533,49 @@ class HandleArgs(object) :
 		parser.add_argument("-eg", "--egypt", action="store_true", help="Parameter to use egypt, a call graph perl script\nDownload here : http://www.gson.org/egypt/ ")
 		parser.add_argument("filename", type=str, nargs='+')
 		args = parser.parse_args()
-		
-		# print args
-		
+
 		# get filename or directory	
 		if len(args.filename) :
 			self.file_dir_name = args.filename[0]
-			
+
 		# interactive
 		self.interactive = args.interactive
-		
-		# auto detect libs	
+
+		# auto detect libs
 		self.vdetect_lib = args.detect_lib
-		
+
 		# verbose
 		self.verbose = args.verbose
-		
+
 		# debug
 		self.debug = args.debug
-		
+
 		# optimize
 		self.optimize = args.optimize
-		
+
 		#full optimize
 		self.full_optimize = args.full_optimize
-		
+
 		# cfg file
 		if args.cfg != None :
 			self.cmak_cfg = args.cfg
-			
+
 		# objdir
 		if args.obj_dir != None :
 			self.objdir = args.obj_dir
-		
-		# include path	
+
+		# include path
 		if args.include_dir != None :
 			self.include_path_list.append(args.include_dir)
-		
+
 		# cflags
 		if args.cflags != None :
 			self.cflags = self.cflags + " ".join(args.cflags)
-	
-		#ldflags	
+
+		#ldflags
 		if args.ldflags != None :
 			self.ldflags = self.ldflags + " ".join(args.ldflags)
-	
+
 		# executable
 		if args.executable != None :
 			self.executable = args.executable
@@ -600,7 +583,7 @@ class HandleArgs(object) :
 		# makefile	
 		if args.makefile != None :
 			self.makefile = args.makefile
-			
+
 		# egypt
 		if args.egypt == True :
 			self.egypt = True
@@ -610,36 +593,34 @@ class HandleArgs(object) :
 class MetaClass(HandleArgs, HandleConfig, HandleLib, HandleMain, HandleInteractive, HandleMakefile, HandleFiles) :
 	''' MetaClass, a class to call all other classes and share variables and functions '''
 	def __init__(self) :
-	
-		self.define = ['gcc', 'morphos']
-		
+		# Todo : Auto detect system
+		# self.define = ['gcc', 'morphos']
+		self.define = ['gcc', 'unix']
+
 		HandleArgs.__init__(self)
 		HandleFiles.__init__(self)
-		
+
 		HandleInteractive.__init__(self)
 		HandleMakefile.__init__(self)
-		
+
 		self.handleMenuArgs()
 		self.find_dir_files(self.file_dir_name)
 		if self.vdetect_lib == True :
 			HandleConfig.__init__(self)
 			HandleLib.__init__(self)
-			
-			# self.cmak_define(define)		
+
 			self.load_cmak_cfg()
 			self.auto_detect_lib()
-			
 		else :
 			HandleMain.__init__(self)
 			self.auto_detect_main()
-		
+
 		self.interactive_mode()	
 		self.create_makefile()
 
 
 def delext(filename):
-	return os.path.splitext(filename)[0] 	
-	
+	return os.path.splitext(filename)[0]
 
 # singleton or something like that
 go=MetaClass()
