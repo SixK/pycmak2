@@ -8,7 +8,7 @@ import glob
 import datetime
 from argparse import RawTextHelpFormatter
 
-VERSION = '2.7.0 (1/2019)'
+VERSION = '2.8.0 (4/2020)'
 
 
 class HandleFiles(object) :
@@ -25,29 +25,25 @@ class HandleFiles(object) :
 			sys.exit(1)
    
 		ext = os.path.splitext(filename)[-1]
-		invalid_extention = 1
+		valid_extention = ext in self.valid_extention
     
-		if ext in self.valid_extention :
-			invalid_extention = 0
-			self.cpp_source = (0 if (ext == '.c') else 1)
-
-		if invalid_extention == 1 :
+		if valid_extention == False :
 			print('File %s don\'t have valid c/c++ extension. --> %s' % (filename,ext))
-		else:
+		else :
+			self.cpp_source = (0 if (ext == '.c') else 1)
 			print('Adding file : %s'%(filename))
 			self.cpp_file_list.append(filename)
 
 
-	def handle_file_list(self, file_list, dir='') :
+	def handle_file_list(self, file_list, dir=''):
 		''' Get a file list and ask to check them or go in sub dir '''
-		for value in file_list :
+		for value in file_list:
 			if ((value != '.') and (value != '..')):
-				if dir == '' :	mypath = value
-				else : 			mypath = '%s/%s' % (dir, value)
+				mypath = os.path.join(dir, value)
 
 				if os.path.isdir(mypath) :
 					self.find_dir_files(mypath)
-				else:					
+				else:
 					self.cpp_file(mypath)
 
 	def find_dir_files(self, dir):
@@ -65,6 +61,8 @@ class HandleFiles(object) :
 			file_list = os.listdir (dir)
 
 			self.handle_file_list(file_list, dir)
+			if self.objdir == '':
+				self.objdir=dir
 
 		# handle patterns
 		if dir.find("*") != -1 :
@@ -82,11 +80,11 @@ class HandleConfig (object) :
 
 		self.loaded = 0
 
-	def checkCfg(self, path) :
-		if self.loaded == 0 :
+	def checkCfg(self, path):
+		if self.loaded == 0:
 			print('Trying %s'%(path))
 
-		if os.path.exists(path) :
+		if os.path.exists(path):
 			self.load_cmak_cfg_ex(path)
 			self.loaded = 1
 			print('Config File Found : %s'%(path))
@@ -97,7 +95,7 @@ class HandleConfig (object) :
 			self.checkCfg(self.cmak_cfg)
 
 		self.checkCfg('./cmak2.cfg')
-		self.checkCfg(os.path.dirname(__file__) + '/cmak2.cfg')
+		self.checkCfg(os.path.join(os.path.dirname(__file__),'cmak2.cfg'))
 
 		if self.cmak_defined('unix') or self.cmak_defined('morphos'):
 			self.checkCfg('/etc/cmak2.cfg')
@@ -188,7 +186,7 @@ class HandleConfig (object) :
 						self.cmak_header_list.append(arg_header)
 						self.cmak_ldflags_list.append(arg_ldflags)
 						self.cmak_cflags_list.append(arg_cflags)
-						continue		
+						continue
 
 					if command == 'cflags_default' :
 						table = arg.split(':')
@@ -255,28 +253,28 @@ class HandleLib(object) :
 	''' Try to find lib files to add to cflags and ldflags'''
 	def __init__ (self) :
 		self.visited_header_list=[]
-	
+
 	def auto_detect_lib(self):
 		''' check all files '''
 		for  value in self.cpp_file_list:
 			print("file: "+value)
 			self.detect_lib(value, 0, 0)
-	
+
 	def search_header(self, filename):
 		''' try to find headers '''
 		for value in self.include_path_list:
-			if os.path.exists(('%s/%s' % (value, filename))):
-				return ('%s/%s' % (value, filename))
-		if os.path.exists(('/usr/include/%s' % (filename,))):
-			return ('/usr/include/%s' % (filename,))
+			if os.path.exists(os.path.join(value, filename)):
+				return os.path.join(value, filename)
+		if os.path.exists(os.path.join('/usr/include/', filename)):
+			return os.path.join('/usr/include/', filename)
 		if 'linux' in self.define:
-			if os.path.exists(('/usr/include/linux/%s' % (filename,))):
-					return ('/usr/include/linux/%s' % (filename,))
-		if os.path.exists(('/usr/local/include/%s' % (filename,))):
-			return ('/usr/local/include/%s' % (filename,))
+			if os.path.exists(os.path.join('/usr/include/linux/', filename)):
+					return os.path.join('/usr/include/linux/', filename)
+		if os.path.exists(os.path.join('/usr/local/include/', filename)):
+			return os.path.join('/usr/local/include/', filename)
 		return filename
 
-	def get_include(self, line_str) :
+	def get_include(self, line_str):
 		''' find include name in line '''
 		include = line_str.strip()
 		include = re.sub(r'^\s*\#include\s*["<]', '', include)
@@ -284,7 +282,7 @@ class HandleLib(object) :
 
 		return include
 
-	def find_flags(self, include, filename) :
+	def find_flags(self, include, filename):
 		i = 0
 		for value in self.cmak_header_list:
 			if include.startswith(value):
@@ -304,8 +302,8 @@ class HandleLib(object) :
 
 		return i
 
-	def already_visited_header(self, filename) :
-		if filename in self.visited_header_list :
+	def already_visited_header(self, filename):
+		if filename in self.visited_header_list:
 			print ('IGNORE: file %s already scanned\n' % (filename,))
 			return True
 
@@ -354,7 +352,7 @@ class HandleLib(object) :
 				if (recursive_lvl == 0):
 					if HandleMain().test_main(filename, line_str):
 						executable = os.path.basename(delext(filename))
-
+		fp.close()
 
 
 class HandleInteractive (object) :
@@ -374,39 +372,35 @@ class HandleInteractive (object) :
 		return ret
 
 
-class HandleMakefile(object) :
-	def __init__ (self) :
+class HandleMakefile(object):
+	def __init__ (self):
 		self.cc = 'gcc:g++'
 
-	def getCC(self) :
+	def getCC(self):
 		mysplit = self.cc.split(':')
-
-		if self.cpp_source:	ret = mysplit[1]
-		else:	ret = mysplit[0]
-
-		return ret
+		return mysplit[1] if self.cpp_source else mysplit[0]
 
 	def create_makefile(self):
 		global VERSION
  
-		if self.executable == '' :
+		if self.executable == '':
 			self.executable = 'main'
 
 		self.cc=self.getCC()
 		i = datetime.datetime.now()
 
-		if self.debug :
-			if self.cpp_source :
-				self.cflags = "-g -Wall "+self.cflags 
+		if self.debug:
+			if self.cpp_source:
+				self.cflags = "-g -Wall " + self.cflags 
 				self.ldflags = "-Wl, --traditional-format " + self.ldflags
 				debug_string = "objdump --source --line-numbers --demangle --syms --reloc --disassemble-all "
 			else :
 				debug_string = "objdump --syms --reloc --disassemble-all "
 
-		if self.optimize :
+		if self.optimize:
 			self.cflags = "-O2 "+self.cflags
 
-		if self.full_optimize :
+		if self.full_optimize:
 			self.cflags = "-O3 "+self.cflags
 			# remove unused functions
 			# self.ldflags = " -Wl, --gc-sections "+self.ldflags
@@ -440,8 +434,8 @@ class HandleMakefile(object) :
 		fp.write('OBJS =')    
 		for value in self.cpp_file_list:
 			fp.write(' ')
-			if (self.objdir != ''):
-				fp.write('%s/' % (self.objdir,))
+			#if (self.objdir != ''):
+			#	fp.write('%s/' % (self.objdir,))
 			print("File found : %s"%(value))
 
 			if (value[0:1] == '/'):
@@ -455,8 +449,8 @@ class HandleMakefile(object) :
 			if (value[0:1] == '/'):
 				value = value[1: 1+ len(value)]
 			obj = ('%s.o' % (delext(value),))
-			if (self.objdir != ''):
-				obj = ('%s/%s' % (self.objdir, obj))
+			# if (self.objdir != ''):
+			#	obj = ('%s/%s' % (self.objdir, obj))
 			fp.write('%s : %s\n' % (obj, value))
 			fp.write('\t$(CC) -c %s $(CFLAGS) -o %s\n\n' % (value, obj))
         
@@ -480,7 +474,8 @@ class HandleMakefile(object) :
 
 		if self.egypt == True :
 			fp.write('\n\negypt :\n')
-			fp.write('\tegypt *.expand | dot -Tsvg -o $(EGYPT)')
+			fp.write('\tegypt %s | dot -Tsvg -o $(EGYPT)'
+						%(os.path.join(self.objdir,'*.expand')))
 
 		fp.close()
         
@@ -516,7 +511,7 @@ class HandleArgs(object) :
 																				"Edit cmak2.cfg file to \n"
 																				"customise this detection")
 		parser.add_argument("--cfg", help="Select manualy Path for cmak2.cfg")
-		parser.add_argument("-od", "--obj-dir", help="Directory for .o files")
+		# parser.add_argument("-od", "--obj-dir", help="Directory for .o files")
 		parser.add_argument("-I", "--include-dir", nargs="*", help="Can be defined several times. \n"
 																	"Tell where to find .h files")
 																	
@@ -561,8 +556,8 @@ class HandleArgs(object) :
 			self.cmak_cfg = args.cfg
 
 		# objdir
-		if args.obj_dir != None :
-			self.objdir = args.obj_dir
+		#if args.obj_dir != None :
+		#	self.objdir = args.obj_dir
 
 		# include path
 		if args.include_dir != None :
@@ -590,9 +585,9 @@ class HandleArgs(object) :
 			self.cflags = self.cflags + " -fdump-rtl-expand "
 
 
-class MetaClass(HandleArgs, HandleConfig, HandleLib, HandleMain, HandleInteractive, HandleMakefile, HandleFiles) :
+class MetaClass(HandleArgs, HandleConfig, HandleLib, HandleMain, HandleInteractive, HandleMakefile, HandleFiles):
 	''' MetaClass, a class to call all other classes and share variables and functions '''
-	def __init__(self) :
+	def __init__(self):
 		# Todo : Auto detect system
 		# self.define = ['gcc', 'morphos']
 		self.define = ['gcc', 'unix']
@@ -605,13 +600,13 @@ class MetaClass(HandleArgs, HandleConfig, HandleLib, HandleMain, HandleInteracti
 
 		self.handleMenuArgs()
 		self.find_dir_files(self.file_dir_name)
-		if self.vdetect_lib == True :
+		if self.vdetect_lib == True:
 			HandleConfig.__init__(self)
 			HandleLib.__init__(self)
 
 			self.load_cmak_cfg()
 			self.auto_detect_lib()
-		else :
+		else:
 			HandleMain.__init__(self)
 			self.auto_detect_main()
 
